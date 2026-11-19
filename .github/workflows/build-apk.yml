@@ -1,0 +1,76 @@
+name: Build Android APK and Publish Release
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install dependencies and build web bundle
+        run: |
+          npm install
+          npm run build
+          sed -i 's|<script src="https://www.youtube.com/game_api/v1"></script>||g' dist/index.html
+
+      - name: Initialize Capacitor Android project
+        run: |
+          npm install --no-save @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+          rm -rf android
+          npx cap add android
+          npx cap sync android
+
+      - name: Configure Android manifest for fullscreen WebGL gameplay
+        run: |
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          if ! grep -q 'android:hardwareAccelerated="true"' "$MANIFEST"; then
+            sed -i 's/<application/<application android:hardwareAccelerated="true"/' "$MANIFEST"
+          fi
+
+      - name: Build Android APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Prepare APK artifact
+        run: |
+          mkdir -p release-artifacts
+          cp android/app/build/outputs/apk/debug/app-debug.apk release-artifacts/TurboTumble3D.apk
+          ls -lh release-artifacts/TurboTumble3D.apk
+
+      - name: Upload APK build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TurboTumble3D-APK
+          path: release-artifacts/TurboTumble3D.apk
+
+      - name: Publish APK to GitHub Releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v1.0.${{ github.run_number }}"
+          gh release create "$TAG" release-artifacts/TurboTumble3D.apk \
+            --title "Turbo Tumble 3D ($TAG)" \
+            --notes "Automated Android APK build of Turbo Tumble 3D (with Left/Right touch steering, Chaos Rings, and 3D WebGL skyway gameplay)." \
+            --latest

@@ -1,0 +1,10 @@
+{
+  "appId": "com.turbotumble3d.game",
+  "appName": "Turbo Tumble 3D",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#132238",
+    "webContentsDebuggingEnabled": false
+  }
+}
