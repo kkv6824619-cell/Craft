@@ -1,0 +1,6 @@
+{
+  "name": "Turbo Tumble 3D",
+  "description": "A wild 3D skyway obstacle-course game with dynamic chaos mutators, procedural WebGL graphics, and one-click standalone HTML export for Komma.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
