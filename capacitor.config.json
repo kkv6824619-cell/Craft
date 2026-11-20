@@ -1,10 +1,9 @@
 {
-  "appId": "com.turbotumble3d.game",
-  "appName": "Turbo Tumble 3D",
+  "appId": "com.craft.cargame",
+  "appName": "Craft Car Game",
   "webDir": "dist",
   "android": {
-    "allowMixedContent": true,
-    "backgroundColor": "#132238",
+    "backgroundColor": "#000000",
     "webContentsDebuggingEnabled": false
   }
 }
