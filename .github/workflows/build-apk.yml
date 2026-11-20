@@ -1,69 +1,76 @@
-
-name: Build Craft Car Game APK
+name: Build Android APK and Publish Release
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [ main ]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build-android:
+  build-apk:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '20'
 
-      - name: Setup Java
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: 21
+          distribution: 'temurin'
+          java-version: '17'
 
-      - name: Install project dependencies
-        run: npm install --legacy-peer-deps
+      - name: Install dependencies and build web bundle
+        run: |
+          npm install
+          npm run build
+          sed -i 's|<script src="https://www.youtube.com/game_api/v1"></script>||g' dist/index.html
 
-      - name: Install Capacitor
-        run: npm install @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7 --legacy-peer-deps
+      - name: Initialize Capacitor Android project
+        run: |
+          npm install --no-save @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+          rm -rf android
+          npx cap add android
+          npx cap sync android
 
-      - name: Build game
-        run: npm run build
+      - name: Configure Android manifest for fullscreen WebGL gameplay
+        run: |
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          if ! grep -q 'android:hardwareAccelerated="true"' "$MANIFEST"; then
+            sed -i 's/<application/<application android:hardwareAccelerated="true"/' "$MANIFEST"
+          fi
 
-      - name: Add Android platform
-        run: npx cap add android
-
-      - name: Sync Android project
-        run: npx cap sync android
-
-      - name: Build debug APK
+      - name: Build Android APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --no-daemon
 
-      - name: Upload APK artifact
+      - name: Prepare APK artifact
+        run: |
+          mkdir -p release-artifacts
+          cp android/app/build/outputs/apk/debug/app-debug.apk release-artifacts/TurboTumble3D.apk
+          ls -lh release-artifacts/TurboTumble3D.apk
+
+      - name: Upload APK build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Craft-Car-Game-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 7
+          name: TurboTumble3D-APK
+          path: release-artifacts/TurboTumble3D.apk
 
-      - name: Publish APK to GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: craft-apk-${{ github.run_number }}
-          name: Craft Car Game APK ${{ github.run_number }}
-          body: |
-            Automated APK build for Craft Car Game.
-            This APK is for testing and installation on Android devices.
-          files: android/app/build/outputs/apk/debug/app-debug.apk
-          generate_release_notes: true
+      - name: Publish APK to GitHub Releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v1.0.${{ github.run_number }}"
+          gh release create "$TAG" release-artifacts/TurboTumble3D.apk \
+            --title "Turbo Tumble 3D ($TAG)" \
+            --notes "Automated Android APK build of Turbo Tumble 3D (with Left/Right touch steering, Chaos Rings, and 3D WebGL skyway gameplay)." \
+            --latest
